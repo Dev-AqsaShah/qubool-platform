@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { uploadProfilePhoto } from "@/lib/photos/signedUrl";
+import { moderateText } from "@/lib/ai/anthropic";
 
 const preferenceSchema = z.object({
   field: z.string(),
@@ -53,6 +54,23 @@ export async function POST(request: Request) {
   const body = parsed.data;
 
   const service = createServiceRoleClient();
+
+  // Every free-text profile field is screened (Section 7), same as chat
+  // messages. Profile saves aren't blocked on a flag — borderline cases are
+  // queued for admin review rather than locking the user out of onboarding.
+  const freeText = [body.about_text, body.looking_for_text].filter(Boolean).join("\n\n");
+  if (freeText) {
+    const moderation = await moderateText(freeText);
+    if (moderation.flagged) {
+      await service.from("moderation_queue").insert({
+        source_type: "profile_text",
+        user_id: user.id,
+        reason: moderation.reason,
+        severity: moderation.severity,
+        status: "open",
+      });
+    }
+  }
 
   const { error: profileError } = await service.from("profiles").upsert({
     user_id: user.id,

@@ -70,3 +70,26 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+// Pending "request to view" requests on the current user's own photo.
+export async function GET() {
+  const auth = await createServerSupabaseClient();
+  const { data: { user } } = await auth.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const { data: requests } = await auth
+    .from("photo_access")
+    .select("*")
+    .eq("owner_id", user.id)
+    .eq("status", "requested");
+
+  const viewerIds = (requests ?? []).map((r) => r.viewer_id);
+  const { data: profiles } = viewerIds.length
+    ? await auth.from("profiles").select("user_id, display_name").in("user_id", viewerIds)
+    : { data: [] };
+  const nameMap = new Map((profiles ?? []).map((p) => [p.user_id, p.display_name]));
+
+  return NextResponse.json({
+    requests: (requests ?? []).map((r) => ({ ...r, viewer_name: nameMap.get(r.viewer_id) ?? "Member" })),
+  });
+}
