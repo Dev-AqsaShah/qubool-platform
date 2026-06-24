@@ -309,9 +309,19 @@ create policy interests_parties_select on public.interests
 create policy interests_from_user_insert on public.interests
   for insert with check (from_user = auth.uid());
 
--- matches: either party (or admin) can read.
+-- matches: either party, their accepted wali, or admin can read.
 create policy matches_parties_select on public.matches
-  for select using (user_a = auth.uid() or user_b = auth.uid() or public.is_admin());
+  for select using (
+    user_a = auth.uid()
+    or user_b = auth.uid()
+    or public.is_admin()
+    or exists (
+      select 1 from public.walis w
+      where w.user_id in (matches.user_a, matches.user_b)
+        and w.invited_user_id = auth.uid()
+        and w.status = 'accepted'
+    )
+  );
 
 -- messages: only match participants (or their accepted wali, or admin).
 create policy messages_parties_select on public.messages

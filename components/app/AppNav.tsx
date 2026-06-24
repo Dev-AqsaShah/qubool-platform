@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BrandMark } from "@/components/UnionMotif";
+import { NotificationBell } from "@/components/app/NotificationBell";
 
 const LINKS = [
   { href: "/discover", label: "Discover" },
@@ -28,9 +29,12 @@ export function AppNav({ active }: { active?: string }) {
           </Link>
         ))}
       </div>
-      <Link href="/settings" className="btn btn-ghost">
-        Settings
-      </Link>
+      <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+        <NotificationBell />
+        <Link href="/settings" className="btn btn-ghost">
+          Settings
+        </Link>
+      </div>
     </nav>
   );
 }

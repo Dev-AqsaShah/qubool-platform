@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { sendEmail } from "@/lib/email/resend";
 
 const inviteSchema = z.object({
   wali_contact: z.string().min(3),
@@ -26,6 +27,17 @@ export async function POST(request: Request) {
     .select()
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // The invited contact may not have a Qubool account yet, so this can't
+  // route through notify() (which needs a user id) — email them directly
+  // when the contact looks like an email address.
+  if (parsed.data.wali_contact.includes("@")) {
+    await sendEmail(
+      parsed.data.wali_contact,
+      "You've been invited as a wali on Qubool",
+      "<p>Someone has invited you to be their wali (guardian) on Qubool, with read access to their match chats. Sign in or create an account with this email to accept.</p>"
+    );
+  }
 
   return NextResponse.json({ wali });
 }

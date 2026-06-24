@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { notify } from "@/lib/notifications";
 
 const bodySchema = z.object({
   to_user: z.string().uuid(),
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!reciprocal) {
+    await notify(to_user, "interest_received", { from_user: user.id });
     return NextResponse.json({ match: false });
   }
 
@@ -65,9 +67,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: matchError.message }, { status: 500 });
   }
 
-  await service.from("notifications").insert([
-    { user_id: user.id, type: "new_match", payload: { match_id: match.id, other_user_id: to_user } },
-    { user_id: to_user, type: "new_match", payload: { match_id: match.id, other_user_id: user.id } },
+  await Promise.all([
+    notify(user.id, "new_match", { match_id: match.id, other_user_id: to_user }),
+    notify(to_user, "new_match", { match_id: match.id, other_user_id: user.id }),
   ]);
 
   return NextResponse.json({ match: true, match_id: match.id });

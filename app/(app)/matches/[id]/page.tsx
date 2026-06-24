@@ -10,14 +10,18 @@ export default async function MatchChatPage({ params }: { params: Promise<{ id: 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/sign-in");
 
+  // RLS (matches_parties_select) already permits either participant, an
+  // accepted wali of either participant, or an admin — so a non-null result
+  // here means the viewer is one of those, not necessarily a participant.
   const { data: match } = await supabase.from("matches").select("*").eq("id", id).maybeSingle();
-  if (!match || (match.user_a !== user.id && match.user_b !== user.id)) {
+  if (!match) {
     redirect("/matches");
   }
 
+  const isParticipant = match.user_a === user.id || match.user_b === user.id;
   const otherId = match.user_a === user.id ? match.user_b : match.user_a;
   const { data: profile } = await supabase.from("profiles").select("display_name").eq("user_id", otherId).maybeSingle();
-  const canSendFirstMessage = match.first_message_sent || match.woman_id === user.id;
+  const canSendFirstMessage = isParticipant && (match.first_message_sent || match.woman_id === user.id);
 
   return (
     <div>
@@ -25,9 +29,14 @@ export default async function MatchChatPage({ params }: { params: Promise<{ id: 
       <div className="wrap" style={{ paddingBottom: 80, maxWidth: 720 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <h1 style={{ margin: 0 }}>{profile?.display_name ?? "Member"}</h1>
-          <BlockReportControls targetId={otherId} />
+          {isParticipant && <BlockReportControls targetId={otherId} />}
         </div>
-        {!match.first_message_sent && (
+        {!isParticipant && (
+          <p style={{ color: "var(--muted)", fontSize: ".88rem", marginBottom: 14 }}>
+            You&apos;re viewing this chat as a wali. They&apos;ve been told you may be present.
+          </p>
+        )}
+        {isParticipant && !match.first_message_sent && (
           <p style={{ color: "var(--muted)", fontSize: ".88rem", marginBottom: 14 }}>
             In every match, she sends the first message. {match.woman_id === user.id ? "Go ahead and say hello." : ""}
           </p>

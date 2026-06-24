@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { notify } from "@/lib/notifications";
 
 const bodySchema = z.object({ wali_id: z.string().uuid(), action: z.enum(["accept", "decline"]) });
 
@@ -26,6 +27,10 @@ export async function POST(request: Request) {
     })
     .eq("id", wali.id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (parsed.data.action === "accept") {
+    await notify(wali.user_id, "wali_invite_accepted", { wali_id: wali.id });
+  }
 
   return NextResponse.json({ ok: true });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
+import { notify } from "@/lib/notifications";
 
 const bodySchema = z.object({
   owner_id: z.string().uuid(),
@@ -35,11 +36,7 @@ export async function POST(request: Request) {
       .upsert({ owner_id, viewer_id: user.id, status: "requested" }, { onConflict: "owner_id,viewer_id" });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    await service.from("notifications").insert({
-      user_id: owner_id,
-      type: "photo_request_received",
-      payload: { viewer_id: user.id },
-    });
+    await notify(owner_id, "photo_request_received", { viewer_id: user.id });
     return NextResponse.json({ ok: true });
   }
 
@@ -61,11 +58,7 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   if (status === "approved") {
-    await service.from("notifications").insert({
-      user_id: viewer_id,
-      type: "photo_request_approved",
-      payload: { owner_id },
-    });
+    await notify(viewer_id, "photo_request_approved", { owner_id });
   }
 
   return NextResponse.json({ ok: true });

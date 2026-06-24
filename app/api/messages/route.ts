@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createServerSupabaseClient, createServiceRoleClient } from "@/lib/supabase/server";
 import { moderateText } from "@/lib/ai/anthropic";
+import { notify } from "@/lib/notifications";
 
 const bodySchema = z.object({
   match_id: z.string().uuid(),
@@ -74,11 +75,7 @@ export async function POST(request: Request) {
   }
 
   if (moderationStatus !== "held") {
-    await service.from("notifications").insert({
-      user_id: otherId,
-      type: "new_message",
-      payload: { match_id },
-    });
+    await notify(otherId, "new_message", { match_id });
   }
 
   return NextResponse.json({ message, held: moderationStatus === "held" });
